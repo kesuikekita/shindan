@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スタッフ適性・性格診断</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif;background:#f5f5f0;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px}
+.container{width:100%;max-width:600px}
+.header{text-align:center;margin-bottom:24px}
+.header h1{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:6px}
+.header p{font-size:13px;color:#666}
+.card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px}
+.progress-meta{display:flex;justify-content:space-between;font-size:12px;color:#888;margin-bottom:6px}
+.progress-track{height:6px;background:#eee;border-radius:3px}
+.progress-fill{height:6px;border-radius:3px;background:#534AB7;transition:width .4s ease}
+.q-num{font-size:12px;color:#888;margin-bottom:8px}
+.q-text{font-size:16px;font-weight:600;color:#1a1a1a;line-height:1.6;margin-bottom:20px}
+.choices{display:flex;flex-direction:column;gap:10px}
+.cbtn{padding:14px 16px;border-radius:12px;border:1.5px solid #e0e0e0;background:#fff;color:#333;font-size:14px;cursor:pointer;text-align:left;transition:all .15s;line-height:1.5;font-family:inherit}
+.cbtn:hover{border-color:#534AB7;background:#EEEDFE;color:#3C3489}
+.cbtn.sel{border-color:#534AB7;background:#534AB7;color:#fff}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-top:20px}
+.btn{padding:10px 24px;border-radius:12px;font-size:14px;cursor:pointer;border:1.5px solid #ddd;background:#fff;color:#666;transition:all .15s;font-family:inherit}
+.btn:hover{background:#f5f5f5}
+.btn.primary{background:#534AB7;border-color:#534AB7;color:#fff}
+.btn.primary:hover{background:#3C3489}
+.btn:disabled{opacity:.35;cursor:default}
+.name-section{margin-bottom:20px}
+.name-section label{font-size:14px;font-weight:600;color:#1a1a1a;display:block;margin-bottom:8px}
+.name-input{width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid #ddd;font-size:15px;font-family:inherit;outline:none;transition:border-color .15s}
+.name-input:focus{border-color:#534AB7}
+.result-card{background:#f8f7ff;border-radius:12px;padding:16px;margin-bottom:12px}
+.result-title{font-size:13px;font-weight:600;color:#534AB7;margin-bottom:8px}
+.bar-row{margin-bottom:6px}
+.bar-meta{display:flex;justify-content:space-between;font-size:12px;color:#666;margin-bottom:3px}
+.bar-track{height:7px;background:#e0e0e0;border-radius:4px}
+.bar-fill{height:7px;border-radius:4px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.tag{padding:4px 12px;border-radius:20px;font-size:12px}
+.profile-box{border-radius:12px;padding:14px;margin-bottom:8px;font-size:13px;line-height:1.8}
+.profile-box strong{font-weight:600}
+.sending-msg{text-align:center;padding:20px;font-size:14px;color:#666}
+.success-msg{text-align:center;padding:30px 20px}
+.success-msg .icon{font-size:48px;margin-bottom:16px}
+.success-msg h2{font-size:18px;font-weight:600;color:#1a1a1a;margin-bottom:8px}
+.success-msg p{font-size:13px;color:#666;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>スタッフ適性・性格診断</h1>
+    <p>あなたに最も近い選択肢をひとつ選んでください</p>
+  </div>
+  <div class="card">
+    <div class="progress-meta"><span id="pLabel">1 / 48問</span><span id="pPct">0%</span></div>
+    <div class="progress-track"><div class="progress-fill" id="pFill" style="width:1%"></div></div>
+  </div>
+  <div class="card" id="nameCard">
+    <div class="name-section">
+      <label>あなたの名前を入力してください</label>
+      <input class="name-input" type="text" id="nameInput" placeholder="例：山田 太郎">
+    </div>
+    <button class="btn primary" style="width:100%" onclick="startDiagnosis()">診断をはじめる</button>
+  </div>
+  <div class="card" id="qCard" style="display:none">
+    <div id="qArea"></div>
+  </div>
+  <div class="card" id="resultCard" style="display:none">
+    <div id="resultArea"></div>
+  </div>
+</div>
+
+<script>
+// ★ここにGASのURLを貼り付ける★
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzgkI8FSBonkuHgzecGOgy0hHRt3k6RJ30r8WZgIlufm7Hccuh8mCrC_v6VtsI_Tg/exec';
+
+const CATS=[
+  {id:'exec',label:'実行力',color:'#534AB7'},
+  {id:'lead',label:'リーダーシップ',color:'#EF9F27'},
+  {id:'rel',label:'対人・コミュニケーション',color:'#1D9E75'},
+  {id:'cre',label:'創造性',color:'#D4537E'},
+  {id:'ana',label:'分析思考',color:'#378ADD'},
+  {id:'flex',label:'柔軟性・適応',color:'#888780'},
+  {id:'mot',label:'モチベーション',color:'#639922'},
+  {id:'grow',label:'成長志向',color:'#7F77DD'},
+  {id:'team',label:'チームワーク',color:'#0F6E56'},
+  {id:'motv',label:'心が動く源泉',color:'#BA7517'},
+  {id:'feed',label:'褒め方・叱り方',color:'#993556'},
+  {id:'stress',label:'ストレス・疲れ',color:'#A32D2D'},
+];
+
+const QS=[
+  {g:'exec',q:'締め切りが迫っている。まずやることは？',c:['タスクを分解して優先順位をつけ直す','とにかく手を動かして終わらせにいく','周囲に状況を共有して助けを求める','なぜ追い込まれたか原因を分析する']},
+  {g:'exec',q:'複数の仕事が重なった。どう動く？',c:['締め切りと重要度でマトリクスを作る','一番緊急なものに全集中する','チームで分担して並行で進める','全体像をつかんでから動き出す']},
+  {g:'exec',q:'計画通りに進まない状況が続いている。どう感じる？',c:['原因を洗い出して計画を修正したくなる','「なんとかなる」と切り替えて突き進む','誰かに話して一緒に整理したくなる','「どこで挽回できるか」を考える']},
+  {g:'exec',q:'意味を感じにくい指示されたタスクがある。どうする？',c:['意味を感じなくても質を落とさずやり切る','上司に目的を確認してから取り組む','効率よく短時間で終わらせる','もっと意味のある仕事を並行して進める']},
+  {g:'lead',q:'新しいプロジェクトが始まった。自然とどんな役割を担う？',c:['方向性を決めてみんなを引っ張る','サポートに徹して全員が動きやすくする','自分の専門領域で貢献する','全体の調整役として橋渡しをする']},
+  {g:'lead',q:'チームの意見が割れて決断が必要になった。どうする？',c:['自分が責任を持って決断する','全員が納得するまで議論を続ける','データや事実をもとに最善策を示す','上位者に判断を仰ぐ']},
+  {g:'lead',q:'メンバーが思うように動いてくれない。まず何をする？',c:['1対1で話して困っていることを聞く','期待値と役割を明確に伝え直す','自分が先にやって見せる','チーム全体の目標を再確認する']},
+  {g:'lead',q:'リーダーとして一番難しいと感じる場面は？',c:['メンバーに厳しいことを伝える場面','全員の意見をまとめて方向性を出す場面','失敗の責任を取る場面','メンバーの成長を辛抱強く待つ場面']},
+  {g:'rel',q:'初めて会う人が多いグループに参加した。どう動く？',c:['積極的に話しかけて打ち解けようとする','様子を見ながら自然な流れで馴染んでいく','共通の話題を探して会話のきっかけをつくる','まず聞き役に回って相手を理解する']},
+  {g:'rel',q:'同僚が落ち込んでいるように見える。どう接する？',c:['声をかけて話を聞く','そっとしておいて自分から話すのを待つ','手伝えることを具体的に提案する','いつも通りに接して気を遣わせない']},
+  {g:'rel',q:'自分の意見が多数派と違うとき、どうする？',c:['根拠を整理して丁寧に主張する','場の空気を読んで伝えるタイミングを選ぶ','まず相手の意見を理解してから述べる','少数意見として記録に残してとりあえず従う']},
+  {g:'rel',q:'大事な情報をチームに伝えるとき、どうする？',c:['全員に一斉に伝えてから個別フォローする','相手に応じて伝え方・タイミングを変える','文章でまとめて記録に残してから共有する','まず口頭で話して必要なら文書化する']},
+  {g:'rel',q:'苦手な相手と長期間一緒に仕事することになった。どうする？',c:['仕事の役割に集中して感情を切り離す','相手を理解しようと関わり方を変えてみる','信頼できる第三者に相談しながら進める','最低限の連携に絞って距離を保つ']},
+  {g:'cre',q:'業務改善のアイデアを求められた。どんなアプローチをとる？',c:['他社や他業界の事例を調べてヒントを探す','現場の人に課題を聞いてボトムアップで考える','頭の中でゼロベースで自由に発想する','データを分析して問題の本質を特定してから考える']},
+  {g:'cre',q:'アイデアが行き詰まった。どうやって突破口を見つける？',c:['全然関係ない分野の情報に触れてみる','信頼できる人に話して壁打ちしてもらう','一度離れてリフレッシュしてから戻る','問題を別の角度から言い換えて整理し直す']},
+  {g:'cre',q:'自分のアイデアが却下された。どう感じる？',c:['理由を聞いてすぐ次を考える','少し落ち込むが時間をおいて立て直す','もっと説得力ある形で再提案しようとする','別の切り口で同じ本質を実現しようとする']},
+  {g:'cre',q:'新しいことに挑戦するとき、最初に感じるのは？',c:['ワクワク・やってみたいという好奇心','うまくいくか確認したいという慎重さ','リスクを把握したいという計画性','仲間と一緒にやりたいという期待感']},
+  {g:'ana',q:'施策の結果が想定外だった。最初に何を確認する？',c:['データに異常や誤りがないか確認する','仮説のどこが外れたか原因を追う','現場の人に何が起きていたか聞く','似たケースで過去に何があったか調べる']},
+  {g:'ana',q:'複雑な問題を誰かに説明するとき、どうする？',c:['図や構造で整理して見える化する','まず結論を伝えてから理由を説明する','具体的な事例や例え話を使う','相手の理解度を確認しながら順番に説明する']},
+  {g:'ana',q:'意思決定の場面で、最も重視するのは？',c:['データや根拠の確かさ','直感とこれまでの経験','関係者の合意や納得感','リスクとリターンのバランス']},
+  {g:'ana',q:'資料の中に小さな誤りを見つけた。どう対応する？',c:['すぐに指摘して修正を依頼する','重大かどうか判断してから行動する','自分で直せるなら静かに直す','なぜ誤りが起きたか背景を確認する']},
+  {g:'flex',q:'直前に仕事の段取りが大きく変わった。まず何を感じる？',c:['「なんとかなる」とすぐ切り替えられる','なぜ変わったか理由を確認したくなる','影響範囲を素早く把握しようとする','一度立ち止まって整理してから動く']},
+  {g:'flex',q:'慣れない役割や環境に置かれた。どんな姿勢でいる？',c:['面白い経験として前向きに受け入れる','できることから着実にこなしながら慣れていく','誰かに聞きながらペースをつかんでいく','早く通常のペースに戻したいと思う']},
+  {g:'flex',q:'チームのやり方が自分の感覚と合わないと感じた。どうする？',c:['まず合わせてみて必要なら意見を伝える','なぜそのやり方なのか理解してから判断する','自分のやり方が有効な部分だけ活かす','率直に「こうした方がいい」と伝える']},
+  {g:'mot',q:'仕事で一番「燃える」と感じるのはどんな瞬間？',c:['目標数字を達成したとき','誰かに「助かった」と感謝されたとき','新しい挑戦に取り組んでいるとき','チームが一体になって結果を出したとき']},
+  {g:'mot',q:'モチベーションが下がりやすいのはどんな状況？',c:['同じ作業が繰り返される単調な状況','頑張っても評価に反映されない状況','なぜやるのか目的が見えない状況','一人で孤立して進めなければならない状況']},
+  {g:'mot',q:'理想の職場環境はどれに最も近い？',c:['裁量があって自分で決められる環境','成長できる機会がたくさんある環境','信頼できる仲間と働ける環境','社会や顧客への貢献が見える環境']},
+  {g:'grow',q:'自分の弱点を指摘された。最初の反応は？',c:['素直に受け入れてすぐ改善策を考える','本当にそうか自分でも振り返ってみる','指摘してくれたことへの感謝が先に来る','少し悔しいが時間をおいて冷静に受け止める']},
+  {g:'grow',q:'仕事で大きな失敗をした。どう立ち直る？',c:['原因を分析して仕組み化する','信頼できる人に話してアドバイスをもらう','一度気持ちを切り替えてから前を向く','失敗を糧にしてより大きな挑戦に向かう']},
+  {g:'grow',q:'スキルアップに時間を使うとしたら？',c:['今の仕事に直結するスキルを磨く','将来なりたい姿に必要なことを学ぶ','弱みを補強するより強みをさらに伸ばす','職場外のコミュニティや勉強会に参加する']},
+  {g:'grow',q:'3年後の自分に最も期待することは？',c:['今より専門性が深まっていること','人やチームをまとめられるようになっていること','新しい分野や役割に挑戦していること','組織や社会に大きなインパクトを与えていること']},
+  {g:'team',q:'チームで仕事をするとき、一番大切にしていることは？',c:['全員が同じゴールを向いていること','メンバーの強みが活かされていること','困ったときに助け合える関係性があること','役割と責任が明確であること']},
+  {g:'team',q:'チームの誰かが困っていると気づいた。どうする？',c:['声をかけて「何か手伝える？」と聞く','その作業を自分が引き取れるか考える','その人が自分で解決できるよう後ろから支える','チームとして対応策を一緒に考える']},
+  {g:'team',q:'チームの雰囲気が悪くなってきた。どうする？',c:['原因を率直に話し合う','場を和ませる何かを仕掛けてみる','まず一番困っている人の話を聞く','上司や第三者に入ってもらう']},
+  {g:'team',q:'自分が「犠牲になる」選択を迫られた。どうする？',c:['チームのためなら迷わず引き受ける','なぜ自分が選ばれたか確認してから判断する','できる限り引き受けつつ自分の限界も伝える','別の解決策がないか模索してから判断する']},
+  {g:'motv',q:'仕事で「やってよかった」と思える瞬間に最も近いのは？',c:['誰かの問題が自分のおかげで解決されたとき','目標を上回る結果を出せたとき','新しいことを習得して成長を感じたとき','自分のアイデアが形になったとき']},
+  {g:'motv',q:'どんな仕事に「もっとやりたい」と感じる？',c:['人の役に立つことが直接わかる仕事','数字や結果として成果が見える仕事','自分が学び続けられる仕事','自由に発想できる余白がある仕事']},
+  {g:'motv',q:'頑張ったことが認められるとしたら、どんな形が一番響く？',c:['チーム全員の前で「ありがとう」と言われる','1対1でこっそり「あなたのおかげ」と伝えられる','昇給・昇格という形で反映される','「あなたに任せたい」と次の挑戦を与えられる']},
+  {g:'feed',q:'上司に褒められるとしたら、どのシーンが一番嬉しい？',c:['全員の前で名前を挙げて褒められる','1対1で「よかった」と伝えられる','評価・昇給という形で示される','「次はもっと大きな仕事を任せる」と言われる']},
+  {g:'feed',q:'ミスを指摘されるとしたら、どんな伝え方が一番受け取りやすい？',c:['「こういう事実があった」と具体的に淡々と','「次はこうしよう」と改善策をセットで','「あなたならできる」という期待感と一緒に','二人きりの場で穏やかに']},
+  {g:'feed',q:'フィードバックを受けるとき、どのタイミングが最も受け取りやすい？',c:['問題が起きた直後、その場で','落ち着いた振り返りの場で','定期的な1on1の中で','文章で共有してもらい自分のペースで']},
+  {g:'feed',q:'上司からの評価と自己評価にズレがあった。どうする？',c:['ズレの理由を上司に率直に聞く','自分の評価基準を見直してみる','客観的な第三者に意見を聞く','次の行動でズレを埋めようと努力する']},
+  {g:'stress',q:'ストレスが溜まってきたとき、まず体や行動にどんなサインが出る？',c:['口数が減って一人でいたくなる','ミスや確認漏れが増えてくる','集中力が続かなくなる','イライラして言葉がきつくなる']},
+  {g:'stress',q:'疲れたとき、一番エネルギーが回復する過ごし方は？',c:['一人で静かに過ごす時間をつくる','信頼できる人と話してガス抜きをする','体を動かして気持ちをリセットする','好きなことに没頭して仕事を忘れる']},
+  {g:'stress',q:'どんな状況がストレスになりやすい？',c:['人間関係のトラブルや空気の悪さ','仕事量が多すぎてキャパオーバー','努力が認められない・評価されない状況','やることが不明確で正解がわからない状況']},
+  {g:'stress',q:'プレッシャーの大きな場面で、あなたはどう変化する？',c:['逆に集中力が増して本領を発揮できる','慎重になりすぎて動きが遅くなる','周囲を気にしすぎて判断がブレる','不安より「やるしかない」という気持ちが勝る']},
+];
+
+const T=QS.length;
+let ans=new Array(T).fill(null);
+let cur=0;
+let userName='';
+
+function ci(id){return CATS.find(c=>c.id===id);}
+
+function startDiagnosis(){
+  const n=document.getElementById('nameInput').value.trim();
+  if(!n){alert('名前を入力してください');return;}
+  userName=n;
+  document.getElementById('nameCard').style.display='none';
+  document.getElementById('qCard').style.display='block';
+  render();
+}
+
+function render(){
+  const pct=Math.round(cur/T*100);
+  document.getElementById('pLabel').textContent=`${cur+1} / ${T}問`;
+  document.getElementById('pPct').textContent=pct+'%';
+  document.getElementById('pFill').style.width=Math.max(pct,1)+'%';
+  const q=QS[cur],a=ans[cur],done=ans.filter(x=>x!==null).length;
+  document.getElementById('qArea').innerHTML=`
+    <div class="q-num">Q${cur+1}</div>
+    <div class="q-text">${q.q}</div>
+    <div class="choices">${q.c.map((c,i)=>`<button class="cbtn${a===i?' sel':''}" onclick="sa(${i})">${c}</button>`).join('')}</div>
+    <div class="nav">
+      <button class="btn" onclick="gt(${cur-1})" ${cur===0?'disabled':''}>← 前へ</button>
+      <span style="font-size:12px;color:#999">${done} / ${T} 回答済み</span>
+      <button class="btn primary" onclick="gn()" ${a===null?'disabled':''}>${cur===T-1?'結果を見る':'次へ →'}</button>
+    </div>`;
+}
+
+function sa(i){ans[cur]=i;render();}
+function gt(i){if(i>=0&&i<T){cur=i;render();}}
+function gn(){if(ans[cur]===null)return;if(cur===T-1){showResult();return;}cur++;render();}
+
+function score(catId){
+  const idx=QS.map((q,i)=>q.g===catId?i:-1).filter(i=>i>=0);
+  if(!idx.length)return 0;
+  const v=idx.map(i=>ans[i]===null?2.5:[1,2,3.5,5][ans[i]]??2.5);
+  return parseFloat((v.reduce((a,b)=>a+b,0)/v.length).toFixed(1));
+}
+
+function getPersonality(){
+  const ml=['他者貢献','達成・数字','学習・成長','アイデア採用'];
+  const md={'他者貢献':'「ありがとう」が最大の燃料。貢献実感を定期的に伝えることが大切。','達成・数字':'目標達成・数字の可視化が原動力。KPIや進捗共有が効果的。','学習・成長':'成長機会で燃える。単調な業務が続くと熱が冷めやすい。','アイデア採用':'意見が反映されると一気に火がつく。意見を求める姿勢が重要。'};
+  const mi=QS.findIndex(q=>q.g==='motv');
+  const tm=ml[ans[mi]??0]||'他者貢献';
+  const fi=QS.findIndex(q=>q.g==='feed');
+  const pr=['全員の前で称える','1対1でこっそり認める','評価・昇給で示す','次の挑戦を任せる'][ans[fi]??1];
+  const fd=['事実・具体的に','改善策とセットで','期待感と一緒に','二人きりで穏やかに'][ans[fi+1]??3];
+  const ti=['その場ですぐ','振り返りの場で','定期1on1で','文章で共有'][ans[fi+2]??1];
+  const si=QS.findIndex(q=>q.g==='stress');
+  const sg=['口数が減る','ミス・確認漏れが増える','集中力が続かなくなる','言葉がきつくなる'][ans[si]??2];
+  const rc=['一人で静かに過ごす','信頼できる人と話す','体を動かしてリセット','好きなことに没頭'][ans[si+1]??2];
+  const sr=['人間関係・空気の悪さ','業務量・キャパオーバー','評価されない状況','役割・正解が不明確'][ans[si+2]??0];
+  return{tm,md:md[tm]||'',pr,fd,ti,sg,rc,sr};
+}
+
+function showResult(){
+  document.getElementById('qCard').style.display='none';
+  document.getElementById('resultCard').style.display='block';
+  document.getElementById('pLabel').textContent=`${T} / ${T}問`;
+  document.getElementById('pPct').textContent='100%';
+  document.getElementById('pFill').style.width='100%';
+
+  const sk=CATS.filter(c=>!['motv','feed','stress'].includes(c.id));
+  const scores=Object.fromEntries(sk.map(c=>[c.id,score(c.id)]));
+  const overall=parseFloat((Object.values(scores).reduce((a,b)=>a+b,0)/sk.length).toFixed(1));
+  const sorted=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const top3=sorted.slice(0,3).map(([id])=>ci(id).label);
+  const low2=sorted.slice(-2).map(([id])=>ci(id).label);
+  const p=getPersonality();
+
+  document.getElementById('resultArea').innerHTML=`
+    <div style="font-size:18px;font-weight:600;color:#1a1a1a;margin-bottom:4px">診断結果 — ${userName}さん</div>
+    <div style="font-size:13px;color:#888;margin-bottom:16px">スキル総合：${overall} / 5.0</div>
+    <div class="tags">
+      ${top3.map(t=>`<span class="tag" style="background:#E1F5EE;color:#0F6E56">強み：${t}</span>`).join('')}
+      ${low2.map(t=>`<span class="tag" style="background:#FAEEDA;color:#854F0B">育成：${t}</span>`).join('')}
+    </div>
+    <div class="result-card">
+      <div class="result-title">スキル・行動傾向</div>
+      ${sk.map(c=>`<div class="bar-row"><div class="bar-meta"><span>${c.label}</span><span>${score(c.id).toFixed(1)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${score(c.id)/5*100}%;background:${c.color}"></div></div></div>`).join('')}
+    </div>
+    <div class="profile-box" style="background:#FFF8E8;color:#633806"><strong>心が動く源泉：${p.tm}</strong><br>${p.md}</div>
+    <div class="profile-box" style="background:#FFF0F5;color:#72243E"><strong>褒め方：</strong>${p.pr}　<strong>叱り方：</strong>${p.fd}<br><strong>タイミング：</strong>${p.ti}</div>
+    <div class="profile-box" style="background:#FFF0F0;color:#501313"><strong>ストレスサイン：</strong>${p.sg}　<strong>ストレス源：</strong>${p.sr}<br><strong>回復パターン：</strong>${p.rc}</div>
+    <div id="sendStatus"></div>
+  `;
+
+  sendResult(overall, top3, low2, scores, p);
+}
+
+async function sendResult(overall, top3, low2, scores, p){
+  const statusEl=document.getElementById('sendStatus');
+  statusEl.innerHTML='<div class="sending-msg">結果を送信中...</div>';
+  try {
+    await fetch(GAS_URL, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        name:userName, overall,
+        top3:top3.join('、'), low2:low2.join('、'),
+        exec:scores.exec, lead:scores.lead, rel:scores.rel,
+        cre:scores.cre, ana:scores.ana, flex:scores.flex,
+        mot:scores.mot, grow:scores.grow, team:scores.team,
+        motv:p.tm, praise:p.pr, feed:p.fd,
+        stressSign:p.sg, stressSrc:p.sr, recovery:p.rc
+      })
+    });
+    statusEl.innerHTML=`
+      <div class="success-msg">
+        <div class="icon">✅</div>
+        <h2>送信完了しました！</h2>
+        <p>診断結果がマネージャーに届きました。<br>ご回答ありがとうございました。</p>
+      </div>`;
+  } catch(e) {
+    statusEl.innerHTML='<div class="sending-msg" style="color:#c00">送信に失敗しました。マネージャーにお知らせください。</div>';
+  }
+}
+</script>
+</body>
+</html>

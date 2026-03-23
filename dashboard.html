@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マネージャー用ダッシュボード</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif;background:#f5f5f0;min-height:100vh}
+
+/* ロック画面 */
+.lock{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.lock-card{background:#fff;border-radius:20px;padding:40px 32px;width:100%;max-width:360px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.lock-icon{width:64px;height:64px;background:#EEEDFE;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+.lock-icon svg{width:28px;height:28px;stroke:#534AB7}
+.lock-title{font-size:18px;font-weight:600;color:#1a1a1a;margin-bottom:6px}
+.lock-sub{font-size:13px;color:#888;margin-bottom:24px}
+.pw-input{width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid #ddd;font-size:15px;font-family:inherit;outline:none;margin-bottom:10px;transition:border-color .15s}
+.pw-input:focus{border-color:#534AB7}
+.pw-btn{width:100%;padding:13px;border-radius:12px;background:#534AB7;color:#fff;border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+.pw-btn:hover{background:#3C3489}
+.pw-error{font-size:12px;color:#c00;margin-top:8px;display:none}
+
+/* ダッシュボード */
+.db{display:none}
+.topbar{background:#fff;border-bottom:1px solid #eee;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:16px;font-weight:600;color:#1a1a1a}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.topbar-sub{font-size:12px;color:#888}
+.reload-btn{padding:6px 14px;border-radius:8px;border:1px solid #ddd;background:#fff;font-size:12px;cursor:pointer;font-family:inherit}
+.reload-btn:hover{background:#f5f5f5}
+.logout-btn{padding:6px 14px;border-radius:8px;border:1px solid #ddd;background:#fff;font-size:12px;color:#888;cursor:pointer;font-family:inherit}
+.content{padding:20px;max-width:900px;margin:0 auto}
+.tab-row{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:8px 18px;border-radius:20px;font-size:13px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer;transition:all .15s}
+.tab.active{background:#534AB7;border-color:#534AB7;color:#fff}
+.section{display:none}
+.section.active{display:block}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.metric{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.metric-label{font-size:12px;color:#888;margin-bottom:4px}
+.metric-value{font-size:22px;font-weight:600;color:#1a1a1a}
+.metric-sub{font-size:11px;color:#aaa;margin-top:2px}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.card-title{font-size:12px;font-weight:600;color:#888;margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em}
+.full-card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:16px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;font-size:11px;color:#888}
+.leg-item{display:flex;align-items:center;gap:4px}
+.leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.filter-row{display:flex;gap:6px;flex-wrap:wrap}
+.filter-btn{padding:5px 14px;border-radius:16px;font-size:12px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer;transition:all .15s}
+.filter-btn.active{background:#534AB7;border-color:#534AB7;color:#fff}
+.staff-table{width:100%;border-collapse:collapse;font-size:12px}
+.staff-table th{text-align:left;color:#888;font-weight:500;padding:8px;border-bottom:1px solid #eee}
+.staff-table td{padding:8px;border-bottom:1px solid #f0f0f0;color:#333;vertical-align:middle}
+.staff-table tr:hover td{background:#fafafa}
+.role-badge{display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px}
+.sbar{display:flex;align-items:center;gap:5px}
+.sbar-track{flex:1;height:5px;background:#eee;border-radius:3px}
+.sbar-fill{height:5px;border-radius:3px}
+.pers-table{width:100%;border-collapse:collapse;font-size:12px}
+.pers-table th{text-align:left;color:#888;font-weight:500;padding:8px;border-bottom:1px solid #eee}
+.pers-table td{padding:8px;border-bottom:1px solid #f0f0f0;color:#333;vertical-align:middle}
+.pers-table tr:hover td{background:#fafafa}
+.loading{text-align:center;padding:40px;color:#888;font-size:14px}
+.empty{text-align:center;padding:40px;color:#aaa;font-size:14px}
+</style>
+</head>
+<body>
+
+<!-- ロック画面 -->
+<div class="lock" id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2"/>
+        <path d="M7 11V7a5 5 0 0110 0v4"/>
+      </svg>
+    </div>
+    <div class="lock-title">マネージャー専用</div>
+    <div class="lock-sub">ダッシュボードへアクセスするには<br>パスワードが必要です</div>
+    <input class="pw-input" type="password" id="pwInput" placeholder="パスワードを入力" onkeydown="if(event.key==='Enter')checkPw()">
+    <button class="pw-btn" onclick="checkPw()">ログイン</button>
+    <div class="pw-error" id="pwError">パスワードが違います</div>
+  </div>
+</div>
+
+<!-- ダッシュボード -->
+<div class="db" id="dashboard">
+  <div class="topbar">
+    <h1>チーム診断ダッシュボード</h1>
+    <div class="topbar-right">
+      <span class="topbar-sub" id="staffCount">読み込み中...</span>
+      <button class="reload-btn" onclick="loadData()">更新</button>
+      <button class="logout-btn" onclick="logout()">ログアウト</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="tab-row">
+      <button class="tab active" onclick="switchTab('overview',this)">概要</button>
+      <button class="tab" onclick="switchTab('staff',this)">スタッフ一覧</button>
+      <button class="tab" onclick="switchTab('personality',this)">性格プロフィール</button>
+      <button class="tab" onclick="switchTab('map',this)">育成マップ</button>
+    </div>
+    <div id="tab-overview" class="section active">
+      <div class="metrics" id="metricsArea"></div>
+      <div class="charts-row">
+        <div class="card">
+          <div class="card-title">ロール分布</div>
+          <div class="legend" id="roleLegend"></div>
+          <div style="position:relative;height:180px"><canvas id="roleChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">チーム平均スコア（9軸）</div>
+          <div style="position:relative;height:210px"><canvas id="radarChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div id="tab-staff" class="section">
+      <div class="full-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div class="card-title" style="margin:0">スタッフ一覧</div>
+          <div class="filter-row">
+            <button class="filter-btn active" onclick="filterTable('all',this)">全員</button>
+            <button class="filter-btn" onclick="filterTable('high',this)">高スコア</button>
+            <button class="filter-btn" onclick="filterTable('low',this)">要フォロー</button>
+          </div>
+        </div>
+        <div id="staffTableWrap"></div>
+      </div>
+    </div>
+    <div id="tab-personality" class="section">
+      <div class="full-card">
+        <div class="card-title" style="margin-bottom:14px">性格プロフィール一覧</div>
+        <div id="persTableWrap"></div>
+      </div>
+    </div>
+    <div id="tab-map" class="section">
+      <div class="full-card">
+        <div class="card-title">育成優先マップ（成長志向 × 実行力）</div>
+        <div style="position:relative;height:300px"><canvas id="bubbleChart"></canvas></div>
+        <div class="legend" style="margin-top:10px" id="bubbleLegend"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ★ここにGASのURLを貼り付ける★
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzgkI8FSBonkuHgzecGOgy0hHRt3k6RJ30r8WZgIlufm7Hccuh8mCrC_v6VtsI_Tg/exec';
+const PW = 'Honbu1105';
+
+let allData = [];
+let roleChart = null, radarChart = null, bubbleChart = null;
+
+function checkPw(){
+  if(document.getElementById('pwInput').value === PW){
+    document.getElementById('lockScreen').style.display='none';
+    document.getElementById('dashboard').style.display='block';
+    loadData();
+  } else {
+    document.getElementById('pwError').style.display='block';
+    document.getElementById('pwInput').value='';
+  }
+}
+
+function logout(){
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('lockScreen').style.display='flex';
+  document.getElementById('pwInput').value='';
+  document.getElementById('pwError').style.display='none';
+}
+
+function switchTab(id, btn){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+}
+
+async function loadData(){
+  document.getElementById('staffCount').textContent='読み込み中...';
+  try {
+    const res = await fetch(`${GAS_URL}?action=getAll`);
+    const json = await res.json();
+    if(json.status === 'ok'){
+      allData = json.data;
+      document.getElementById('staffCount').textContent=`${allData.length}名分のデータ`;
+      renderAll();
+    }
+  } catch(e){
+    document.getElementById('staffCount').textContent='読み込み失敗';
+  }
+}
+
+function avg(arr){ return arr.length ? parseFloat((arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1)) : 0; }
+
+function getRole(d){
+  const scores = [
+    {k:'リーダーシップ',v:parseFloat(d['リーダーシップ']||0)},
+    {k:'モチベーション',v:parseFloat(d['モチベーション']||0)},
+    {k:'対人・コミュニケーション',v:parseFloat(d['対人・コミュニケーション']||0)},
+    {k:'実行力',v:parseFloat(d['実行力']||0)},
+    {k:'創造性',v:parseFloat(d['創造性']||0)},
+  ];
+  const top = scores.reduce((a,b)=>b.v>a.v?b:a);
+  const map = {'リーダーシップ':'リーダー型','モチベーション':'推進型','対人・コミュニケーション':'サポーター型','実行力':'実行型','創造性':'クリエイター型'};
+  return map[top.k]||'バランス型';
+}
+
+const ROLE_COLORS={'リーダー型':'#EF9F27','推進型':'#D4537E','サポーター型':'#1D9E75','実行型':'#534AB7','クリエイター型':'#993556','バランス型':'#888780'};
+const BADGE_STYLES={'リーダー型':'background:#FAEEDA;color:#854F0B','推進型':'background:#FBEAF0;color:#72243E','サポーター型':'background:#E1F5EE;color:#0F6E56','実行型':'background:#EEEDFE;color:#3C3489','クリエイター型':'background:#FBEAF0;color:#72243E','バランス型':'background:#F1EFE8;color:#444441'};
+
+function sbar(v,c,max=5){
+  const pct=parseFloat(v||0)/max*100;
+  return `<div class="sbar"><div class="sbar-track"><div class="sbar-fill" style="width:${pct}%;background:${c}"></div></div><span style="font-size:11px;color:#888;min-width:24px">${parseFloat(v||0).toFixed(1)}</span></div>`;
+}
+
+function renderAll(){
+  if(!allData.length){
+    document.getElementById('metricsArea').innerHTML='<div class="empty" style="grid-column:1/-1">まだデータがありません</div>';
+    return;
+  }
+
+  const overalls = allData.map(d=>parseFloat(d['スキル総合']||0));
+  const avgOverall = avg(overalls);
+
+  document.getElementById('metricsArea').innerHTML=`
+    <div class="metric"><div class="metric-label">診断完了</div><div class="metric-value">${allData.length}<span style="font-size:14px;color:#888"> 名</span></div><div class="metric-sub">スタッフ総数</div></div>
+    <div class="metric"><div class="metric-label">チーム平均スコア</div><div class="metric-value">${avgOverall.toFixed(1)}<span style="font-size:14px;color:#888"> / 5</span></div><div class="metric-sub">スキル総合</div></div>
+    <div class="metric"><div class="metric-label">最高スコア</div><div class="metric-value">${Math.max(...overalls).toFixed(1)}</div><div class="metric-sub">${allData.find(d=>parseFloat(d['スキル総合']||0)===Math.max(...overalls))?.['名前']||''}</div></div>
+    <div class="metric"><div class="metric-label">要フォロー</div><div class="metric-value" style="color:#c00">${allData.filter(d=>parseFloat(d['スキル総合']||0)<2.5).length}<span style="font-size:14px"> 名</span></div><div class="metric-sub">総合スコア 2.5未満</div></div>
+  `;
+
+  const roleCounts={};
+  allData.forEach(d=>{const r=getRole(d);roleCounts[r]=(roleCounts[r]||0)+1;});
+  const rl=Object.keys(roleCounts);
+  document.getElementById('roleLegend').innerHTML=rl.map(r=>`<span class="leg-item"><span class="leg-dot" style="background:${ROLE_COLORS[r]||'#888'}"></span>${r} ${roleCounts[r]}名</span>`).join('');
+  if(roleChart)roleChart.destroy();
+  roleChart=new Chart(document.getElementById('roleChart'),{
+    type:'doughnut',
+    data:{labels:rl,datasets:[{data:rl.map(r=>roleCounts[r]),backgroundColor:rl.map(r=>ROLE_COLORS[r]||'#888'),borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw}名`}}}}
+  });
+
+  const axes=['実行力','リーダーシップ','対人・コミュニケーション','創造性','分析思考','柔軟性・適応','モチベーション','成長志向','チームワーク'];
+  const axisAvgs=axes.map(a=>avg(allData.map(d=>parseFloat(d[a]||0))));
+  if(radarChart)radarChart.destroy();
+  radarChart=new Chart(document.getElementById('radarChart'),{
+    type:'radar',
+    data:{
+      labels:['実行力','リーダー','対人','創造性','分析','柔軟性','モチベ','成長','チーム'],
+      datasets:[{label:'チーム平均',data:axisAvgs,backgroundColor:'rgba(83,74,183,0.15)',borderColor:'#534AB7',borderWidth:2,pointRadius:3,pointBackgroundColor:'#534AB7'}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,scales:{r:{min:0,max:5,ticks:{stepSize:1,font:{size:9},backdropColor:'transparent'},pointLabels:{font:{size:10}},grid:{color:'rgba(0,0,0,0.08)'},angleLines:{color:'rgba(0,0,0,0.08)'}}},plugins:{legend:{display:false}}}
+  });
+
+  renderStaffTable(allData);
+  renderPersTable(allData);
+  renderBubble(allData);
+}
+
+function renderStaffTable(data){
+  if(!data.length){document.getElementById('staffTableWrap').innerHTML='<div class="empty">データなし</div>';return;}
+  document.getElementById('staffTableWrap').innerHTML=`
+    <table class="staff-table">
+      <thead><tr><th>名前</th><th>ロール</th><th>強み</th><th>実行</th><th>リーダー</th><th>創造</th><th>対人</th><th>成長</th><th>総合</th></tr></thead>
+      <tbody>${data.map(d=>{
+        const role=getRole(d);
+        return `<tr>
+          <td style="font-weight:500">${d['名前']||''}</td>
+          <td><span class="role-badge" style="${BADGE_STYLES[role]||''}">${role}</span></td>
+          <td style="color:#888;font-size:11px">${(d['強みTOP3']||'').split('、')[0]||''}</td>
+          <td>${sbar(d['実行力'],'#534AB7')}</td>
+          <td>${sbar(d['リーダーシップ'],'#EF9F27')}</td>
+          <td>${sbar(d['創造性'],'#D4537E')}</td>
+          <td>${sbar(d['対人・コミュニケーション'],'#1D9E75')}</td>
+          <td>${sbar(d['成長志向'],'#378ADD')}</td>
+          <td style="font-weight:600;color:#534AB7">${parseFloat(d['スキル総合']||0).toFixed(1)}</td>
+        </tr>`;}).join('')}</tbody>
+    </table>`;
+}
+
+function filterTable(type,btn){
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(type==='all')renderStaffTable(allData);
+  else if(type==='high')renderStaffTable(allData.filter(d=>parseFloat(d['スキル総合']||0)>=3.5));
+  else renderStaffTable(allData.filter(d=>parseFloat(d['スキル総合']||0)<2.5));
+}
+
+function renderPersTable(data){
+  if(!data.length){document.getElementById('persTableWrap').innerHTML='<div class="empty">データなし</div>';return;}
+  document.getElementById('persTableWrap').innerHTML=`
+    <table class="pers-table">
+      <thead><tr><th>名前</th><th>心が動く源泉</th><th>褒め方</th><th>フィードバック</th><th>ストレスサイン</th><th>回復パターン</th></tr></thead>
+      <tbody>${data.map(d=>`<tr>
+        <td style="font-weight:500">${d['名前']||''}</td>
+        <td style="color:#854F0B">${d['心が動く源泉']||''}</td>
+        <td style="color:#72243E">${d['褒め方']||''}</td>
+        <td style="color:#72243E">${d['フィードバック']||''}</td>
+        <td style="color:#791F1F">${d['ストレスサイン']||''}</td>
+        <td style="color:#666">${d['回復パターン']||''}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+function renderBubble(data){
+  const roleGroups={};
+  data.forEach(d=>{
+    const r=getRole(d);
+    if(!roleGroups[r])roleGroups[r]=[];
+    roleGroups[r].push(d);
+  });
+  const datasets=Object.entries(roleGroups).map(([role,members])=>({
+    label:role,
+    data:members.map(d=>({x:parseFloat(d['成長志向']||0),y:parseFloat(d['実行力']||0),r:8,name:d['名前']||''})),
+    backgroundColor:(ROLE_COLORS[role]||'#888')+'99',
+    borderColor:ROLE_COLORS[role]||'#888',borderWidth:1
+  }));
+  document.getElementById('bubbleLegend').innerHTML=Object.keys(roleGroups).map(r=>`<span class="leg-item"><span class="leg-dot" style="background:${ROLE_COLORS[r]||'#888'}"></span>${r}</span>`).join('');
+  if(bubbleChart)bubbleChart.destroy();
+  bubbleChart=new Chart(document.getElementById('bubbleChart'),{
+    type:'bubble',
+    data:{datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      scales:{
+        x:{title:{display:true,text:'成長志向',font:{size:11}},min:0,max:5.5,ticks:{stepSize:1,font:{size:10}}},
+        y:{title:{display:true,text:'実行力',font:{size:11}},min:0,max:5.5,ticks:{stepSize:1,font:{size:10}}}
+      },
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw.name}（実行:${ctx.raw.y} 成長:${ctx.raw.x}）`}}},
+      layout:{padding:10}
+    }
+  });
+}
+</script>
+</body>
+</html>
