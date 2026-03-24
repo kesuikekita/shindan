@@ -46,6 +46,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sa
 .success-msg .icon{font-size:48px;margin-bottom:16px}
 .success-msg h2{font-size:18px;font-weight:600;color:#1a1a1a;margin-bottom:8px}
 .success-msg p{font-size:13px;color:#666;line-height:1.7}
+.action-row{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+.action-btn{padding:14px 16px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;text-align:center;border:none;font-family:inherit;transition:all .15s}
+.action-btn.restart{background:#f5f5f0;color:#333;border:1.5px solid #ddd}
+.action-btn.restart:hover{background:#eee}
+.action-btn.share{background:#1D9E75;color:#fff}
+.action-btn.share:hover{background:#0F6E56}
+.action-btn.pdf{background:#534AB7;color:#fff}
+.action-btn.pdf:hover{background:#3C3489}
+.share-box{background:#f0faf5;border:1.5px solid #1D9E75;border-radius:12px;padding:14px;margin-top:10px;display:none}
+.share-box label{font-size:12px;color:#0F6E56;font-weight:600;display:block;margin-bottom:8px}
+.share-url{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #9FE1CB;background:#fff;font-size:12px;color:#333;font-family:monospace;resize:none;outline:none}
+.copy-btn{margin-top:8px;padding:8px 16px;border-radius:8px;background:#1D9E75;color:#fff;border:none;font-size:13px;cursor:pointer;font-family:inherit;width:100%}
+.copy-btn:hover{background:#0F6E56}
+.copy-done{font-size:12px;color:#0F6E56;text-align:center;margin-top:6px;display:none}
 </style>
 </head>
 <body>
@@ -75,7 +89,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sa
 
 <script>
 // ★ここにGASのURLを貼り付ける★
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzgkI8FSBonkuHgzecGOgy0hHRt3k6RJ30r8WZgIlufm7Hccuh8mCrC_v6VtsI_Tg/exec';
+const GAS_URL = 'YOUR_GAS_URL_HERE';
 
 const CATS=[
   {id:'exec',label:'実行力',color:'#534AB7'},
@@ -231,10 +245,214 @@ function showResult(){
     <div class="profile-box" style="background:#FFF0F5;color:#72243E"><strong>褒め方：</strong>${p.pr}　<strong>叱り方：</strong>${p.fd}<br><strong>タイミング：</strong>${p.ti}</div>
     <div class="profile-box" style="background:#FFF0F0;color:#501313"><strong>ストレスサイン：</strong>${p.sg}　<strong>ストレス源：</strong>${p.sr}<br><strong>回復パターン：</strong>${p.rc}</div>
     <div id="sendStatus"></div>
+    <div id="dqArea"></div>
+    <div class="action-row">
+      <button class="action-btn share" onclick="toggleShareBox()">🔗　結果リンクをコピーする</button>
+      <div class="share-box" id="shareBox">
+        <label>このURLを送ると結果をそのまま見られます</label>
+        <textarea class="share-url" id="shareUrl" rows="3" readonly></textarea>
+        <button class="copy-btn" onclick="copyUrl()">URLをコピー</button>
+        <div class="copy-done" id="copyDone">コピーしました！</div>
+      </div>
+      <button class="action-btn pdf" onclick="printResult()">📄　結果をPDFで保存する</button>
+      <button class="action-btn restart" onclick="restartDiagnosis()">↩　もう一度診断する</button>
+    </div>
   `;
 
+  renderDQ(scores);
   sendResult(overall, top3, low2, scores, p);
+
+  setTimeout(()=>{
+    const shareUrl=buildShareUrl(scores, overall, top3, low2, p);
+    const el=document.getElementById('shareUrl');
+    if(el) el.value=shareUrl;
+  },100);
 }
+
+function getDQJob(scores){
+  const jobs=[
+    {id:'hero',name:'ゆうしゃ',icon:'⚔️',cond:s=>s.lead>=3&&s.mot>=3&&s.rel>=2.5,
+     desc:'なかまを　ひきつける　ちからが　さいきょうの　ぶき！\nぜんせんで　チームを　ひっぱる　そんざい。',
+     stats:{攻撃:'A',魔力:'C',仲間力:'A',適応:'B'},color:'#1D9E75'},
+    {id:'warrior',name:'せんし',icon:'🛡️',cond:s=>s.exec>=3.5&&s.lead<3,
+     desc:'どんな　しめきりも　ちからずくで　のりきる　じっこうりょくの　かたまり。',
+     stats:{攻撃:'S',魔力:'D',仲間力:'B',適応:'C'},color:'#534AB7'},
+    {id:'mage',name:'まほうつかい',icon:'🔮',cond:s=>s.ana>=3&&s.cre>=3,
+     desc:'データと　ろんりが　ぶき。ぶんせきと　そうぞうで　ふかのうを　かのうにする。',
+     stats:{攻撃:'C',魔力:'S',仲間力:'C',適応:'B'},color:'#7F77DD'},
+    {id:'sage',name:'けんじゃ',icon:'📚',cond:s=>s.ana>=3&&s.grow>=3,
+     desc:'ぶんせきりょくと　せいちょうし　りょうほう　そなえた　まれな　そんざい。\nチームの　のうみそ　やく。',
+     stats:{攻撃:'B',魔力:'A',仲間力:'B',適応:'A'},color:'#378ADD'},
+    {id:'priest',name:'そうりょ',icon:'✨',cond:s=>s.rel>=3.5&&s.team>=3,
+     desc:'なかまの　ちからを　ひきだし　チームを　まもる。\nあなたが　いると　パーティーが　あんていする。',
+     stats:{攻撃:'C',魔力:'B',仲間力:'S',適応:'A'},color:'#1D9E75'},
+    {id:'bard',name:'ぎんゆうしじん',icon:'🎵',cond:s=>s.rel>=3&&s.com>=3,
+     desc:'ことばと　ふんいきで　チームを　つなぐ。\nあなたの　コミュ力が　そしきの　くうきを　かえる。',
+     stats:{攻撃:'C',魔力:'B',仲間力:'A',適応:'S'},color:'#D4537E'},
+    {id:'thief',name:'とうぞく',icon:'🗡️',cond:s=>s.flex>=3&&s.exec>=2.5,
+     desc:'へんかに　つよく　すきまを　ぬける　きどうりょく。\nどんな　かんきょうでも　すばやく　てきおうする。',
+     stats:{攻撃:'B',魔力:'C',仲間力:'B',適応:'S'},color:'#EF9F27'},
+    {id:'creator',name:'まものつかい',icon:'🌟',cond:s=>s.cre>=3.5,
+     desc:'だれも　おもいつかない　はっそうで　ふかのうを　かのうにする。\nそうぞうせいが　さいだいの　ぶき。',
+     stats:{攻撃:'B',魔力:'A',仲間力:'C',適応:'B'},color:'#D4537E'},
+  ];
+  return jobs.find(j=>j.cond(scores)) || {
+    id:'balance',name:'けんじゃのたまご',icon:'🥚',
+    desc:'すべての　のうりょくが　まんべんなく　ある　バランス型。\nこれから　どの　しょくぎょうにも　なれる　かのうせいを　もつ。',
+    stats:{攻撃:'B',魔力:'B',仲間力:'B',適応:'B'},color:'#888780'
+  };
+}
+
+function drawDQSprite(canvas, color){
+  const ctx=canvas.getContext('2d');
+  ctx.imageSmoothingEnabled=false;
+  ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,80,96);
+  const skin='#f4c07a',hair='#8B4513',armor=color,cape='#c80000';
+  const eye='#000',sword='#c0c0c0',hilt='#DAA520',white='#fff',boot='#3d1c02',belt='#8B4513';
+  function px(x,y,c){ctx.fillStyle=c;ctx.fillRect(x*4,y*4,4,4);}
+  px(5,1,hair);px(6,1,hair);px(7,1,hair);px(8,1,hair);px(9,1,hair);
+  px(4,2,hair);px(5,2,skin);px(6,2,skin);px(7,2,skin);px(8,2,skin);px(9,2,hair);px(10,2,hair);
+  px(4,3,hair);px(5,3,skin);px(6,3,eye);px(7,3,skin);px(8,3,eye);px(9,3,skin);px(10,3,hair);
+  px(4,4,hair);px(5,4,skin);px(6,4,skin);px(7,4,skin);px(8,4,skin);px(9,4,skin);px(10,4,hair);
+  px(5,5,skin);px(6,5,skin);px(7,5,skin);px(8,5,skin);px(9,5,skin);
+  px(5,6,skin);px(6,6,skin);px(7,6,skin);px(8,6,skin);
+  px(3,7,cape);px(4,7,armor);px(5,7,armor);px(6,7,armor);px(7,7,armor);px(8,7,armor);px(9,7,armor);px(10,7,cape);
+  px(2,8,cape);px(3,8,armor);px(4,8,armor);px(5,8,armor);px(6,8,armor);px(7,8,armor);px(8,8,armor);px(9,8,armor);px(10,8,cape);
+  px(2,9,cape);px(3,9,armor);px(4,9,white);px(5,9,armor);px(6,9,belt);px(7,9,armor);px(8,9,white);px(9,9,armor);px(10,9,cape);
+  px(2,10,cape);px(3,10,armor);px(4,10,armor);px(5,10,armor);px(6,10,armor);px(7,10,armor);px(8,10,armor);px(9,10,armor);px(10,10,cape);
+  px(12,7,sword);px(12,8,sword);px(12,9,hilt);px(12,10,sword);px(12,11,sword);px(12,12,sword);px(12,13,sword);
+  px(11,9,hilt);px(13,9,hilt);
+  px(3,11,armor);px(4,11,armor);px(5,11,armor);px(6,11,armor);px(7,11,armor);px(8,11,armor);px(9,11,armor);px(10,11,armor);
+  px(4,12,boot);px(5,12,boot);px(7,12,boot);px(8,12,boot);
+  px(4,13,boot);px(5,13,boot);px(7,13,boot);px(8,13,boot);
+  px(3,14,boot);px(4,14,boot);px(5,14,boot);px(7,14,boot);px(8,14,boot);px(9,14,boot);
+}
+
+function renderDQ(scores){
+  const job=getDQJob(scores);
+  const gradeColor={'S':'#f0e68c','A':'#00c800','B':'#7fffd4','C':'#f0a030','D':'#ff8888'};
+  const statsHtml=Object.entries(job.stats).map(([k,v])=>`
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+      <span style="font-size:11px;color:#7fffd4;min-width:44px">${k}</span>
+      <div style="flex:1;height:8px;background:#111;border:1px solid #333;border-radius:1px">
+        <div style="height:8px;border-radius:1px;background:${gradeColor[v]||'#888'};width:${{S:100,A:80,B:60,C:40,D:20}[v]||50}%;transition:width .8s ease"></div>
+      </div>
+      <span style="font-size:12px;font-weight:600;min-width:16px;color:${gradeColor[v]||'#888'}">${v}</span>
+    </div>`).join('');
+
+  const el=document.getElementById('dqArea');
+  el.innerHTML=`
+    <div style="background:#1a1a2e;border-radius:12px;padding:16px;margin-top:16px;font-family:monospace">
+      <div style="text-align:center;font-size:14px;color:#f0e68c;letter-spacing:3px;margin-bottom:12px">★ しょくぎょう はんてい ★</div>
+      <div style="background:#000080;border:2px solid #f0e68c;padding:8px 12px;text-align:center;margin-bottom:12px;border-radius:2px">
+        <div style="font-size:20px;color:#fff;letter-spacing:3px">${job.icon}　${job.name}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:88px 1fr;gap:12px;margin-bottom:12px">
+        <canvas id="dqCanvas" width="80" height="96" style="image-rendering:pixelated;border:2px solid #444;background:#000;border-radius:4px"></canvas>
+        <div style="background:#000033;border:2px solid #4444aa;border-radius:2px;padding:10px">${statsHtml}</div>
+      </div>
+      <div style="background:#000;border:2px solid #f0e68c;border-radius:2px;padding:10px 12px;font-size:12px;color:#fff;line-height:2;white-space:pre-wrap">${job.desc}</div>
+    </div>`;
+
+  const canvas=document.getElementById('dqCanvas');
+  if(canvas) drawDQSprite(canvas, job.color);
+}
+
+function buildShareUrl(scores, overall, top3, low2, p){
+  const data={
+    name:userName, overall,
+    top3:top3.join('、'), low2:low2.join('、'),
+    scores:Object.fromEntries(Object.entries(scores).map(([k,v])=>[k,v])),
+    motv:p.tm, praise:p.pr, feed:p.fd, timing:p.ti,
+    stressSign:p.sg, stressSrc:p.sr, recovery:p.rc
+  };
+  const encoded=btoa(encodeURIComponent(JSON.stringify(data)));
+  return `${location.origin}${location.pathname}?result=${encoded}`;
+}
+
+function toggleShareBox(){
+  const box=document.getElementById('shareBox');
+  if(box.style.display==='block'){box.style.display='none';return;}
+  box.style.display='block';
+}
+
+function copyUrl(){
+  const url=document.getElementById('shareUrl').value;
+  navigator.clipboard.writeText(url).then(()=>{
+    const done=document.getElementById('copyDone');
+    done.style.display='block';
+    setTimeout(()=>done.style.display='none',2000);
+  });
+}
+
+function printResult(){
+  window.print();
+}
+
+function restartDiagnosis(){
+  if(!confirm('もう一度診断しますか？回答内容はリセットされます。')){return;}
+  ans=new Array(T).fill(null);
+  cur=0;
+  userName='';
+  document.getElementById('resultCard').style.display='none';
+  document.getElementById('nameCard').style.display='block';
+  document.getElementById('nameInput').value='';
+  document.getElementById('pLabel').textContent='1 / '+T+'問';
+  document.getElementById('pPct').textContent='0%';
+  document.getElementById('pFill').style.width='1%';
+}
+
+function checkUrlResult(){
+  const params=new URLSearchParams(location.search);
+  const encoded=params.get('result');
+  if(!encoded)return;
+  try{
+    const data=JSON.parse(decodeURIComponent(atob(encoded)));
+    userName=data.name||'';
+    document.getElementById('nameCard').style.display='none';
+    document.getElementById('qCard').style.display='none';
+    document.getElementById('resultCard').style.display='block';
+    document.getElementById('pLabel').textContent=T+' / '+T+'問';
+    document.getElementById('pPct').textContent='100%';
+    document.getElementById('pFill').style.width='100%';
+
+    const sk=CATS.filter(c=>!['motv','feed','stress'].includes(c.id));
+    const scores=data.scores||{};
+    const top3=(data.top3||'').split('、');
+    const low2=(data.low2||'').split('、');
+    const p={tm:data.motv||'',md:'',pr:data.praise||'',fd:data.feed||'',ti:data.timing||'',sg:data.stressSign||'',rc:data.recovery||'',sr:data.stressSrc||''};
+
+    document.getElementById('resultArea').innerHTML=`
+      <div style="font-size:18px;font-weight:600;color:#1a1a1a;margin-bottom:4px">診断結果 — ${userName}さん</div>
+      <div style="font-size:13px;color:#888;margin-bottom:16px">スキル総合：${data.overall} / 5.0</div>
+      <div class="tags">
+        ${top3.map(t=>`<span class="tag" style="background:#E1F5EE;color:#0F6E56">強み：${t}</span>`).join('')}
+        ${low2.map(t=>`<span class="tag" style="background:#FAEEDA;color:#854F0B">育成：${t}</span>`).join('')}
+      </div>
+      <div class="result-card">
+        <div class="result-title">スキル・行動傾向</div>
+        ${sk.map(c=>`<div class="bar-row"><div class="bar-meta"><span>${c.label}</span><span>${parseFloat(scores[c.id]||0).toFixed(1)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${parseFloat(scores[c.id]||0)/5*100}%;background:${c.color}"></div></div></div>`).join('')}
+      </div>
+      <div class="profile-box" style="background:#FFF8E8;color:#633806"><strong>心が動く源泉：${p.tm}</strong></div>
+      <div class="profile-box" style="background:#FFF0F5;color:#72243E"><strong>褒め方：</strong>${p.pr}　<strong>叱り方：</strong>${p.fd}<br><strong>タイミング：</strong>${p.ti}</div>
+      <div class="profile-box" style="background:#FFF0F0;color:#501313"><strong>ストレスサイン：</strong>${p.sg}　<strong>ストレス源：</strong>${p.sr}<br><strong>回復パターン：</strong>${p.rc}</div>
+      <div class="action-row">
+        <button class="action-btn share" onclick="toggleShareBox()">🔗　結果リンクをコピーする</button>
+        <div class="share-box" id="shareBox">
+          <label>このURLを送ると結果をそのまま見られます</label>
+          <textarea class="share-url" id="shareUrl" rows="3" readonly>${location.href}</textarea>
+          <button class="copy-btn" onclick="copyUrl()">URLをコピー</button>
+          <div class="copy-done" id="copyDone">コピーしました！</div>
+        </div>
+        <button class="action-btn pdf" onclick="printResult()">📄　結果をPDFで保存する</button>
+        <button class="action-btn restart" onclick="restartDiagnosis()">↩　もう一度診断する</button>
+      </div>
+    `;
+    renderDQ(scores);
+  }catch(e){console.error(e);}
+}
+
+checkUrlResult();
 
 async function sendResult(overall, top3, low2, scores, p){
   const statusEl=document.getElementById('sendStatus');
