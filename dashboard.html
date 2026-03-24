@@ -66,9 +66,61 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sa
 .pers-table tr:hover td{background:#fafafa}
 .loading{text-align:center;padding:40px;color:#888;font-size:14px}
 .empty{text-align:center;padding:40px;color:#aaa;font-size:14px}
+.name-link{color:#534AB7;cursor:pointer;text-decoration:underline;font-weight:600}
+.name-link:hover{color:#3C3489}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;overflow-y:auto;padding:24px 16px}
+.modal-overlay.open{display:flex;align-items:flex-start;justify-content:center}
+.modal{background:#fff;border-radius:20px;width:100%;max-width:560px;overflow:hidden;margin:auto}
+.modal-header{padding:20px 24px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between}
+.modal-header h2{font-size:18px;font-weight:600;color:#1a1a1a}
+.modal-close{width:32px;height:32px;border-radius:50%;border:none;background:#f5f5f0;cursor:pointer;font-size:18px;color:#888;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{background:#eee}
+.modal-body{padding:20px 24px}
+.modal-section{margin-bottom:16px}
+.modal-section-title{font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+.modal-bar-row{margin-bottom:7px}
+.modal-bar-meta{display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:3px}
+.modal-bar-track{height:8px;background:#eee;border-radius:4px}
+.modal-bar-fill{height:8px;border-radius:4px}
+.modal-profile{border-radius:12px;padding:12px 14px;margin-bottom:8px;font-size:13px;line-height:1.8}
+.modal-profile strong{font-weight:600}
+.modal-footer{padding:16px 24px;border-top:1px solid #eee;display:flex;gap:10px}
+.modal-btn{flex:1;padding:12px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;text-align:center;border:none;font-family:inherit;transition:all .15s}
+.modal-btn.share{background:#1D9E75;color:#fff}
+.modal-btn.share:hover{background:#0F6E56}
+.modal-btn.pdf{background:#534AB7;color:#fff}
+.modal-btn.pdf:hover{background:#3C3489}
+.modal-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.modal-tag{padding:4px 12px;border-radius:20px;font-size:12px}
+.dq-box{background:#1a1a2e;border-radius:12px;padding:14px;margin-bottom:16px;font-family:monospace}
+.dq-title{text-align:center;font-size:13px;color:#f0e68c;letter-spacing:3px;margin-bottom:10px}
+.dq-name-plate{background:#000080;border:2px solid #f0e68c;padding:6px 12px;text-align:center;margin-bottom:10px;border-radius:2px}
+.dq-name-plate div{font-size:18px;color:#fff;letter-spacing:3px}
+.dq-stats{background:#000033;border:2px solid #4444aa;border-radius:2px;padding:10px}
+.dq-stat-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.dq-stat-label{font-size:11px;color:#7fffd4;min-width:52px}
+.dq-stat-track{flex:1;height:7px;background:#111;border:1px solid #333;border-radius:1px}
+.dq-stat-fill{height:7px;border-radius:1px}
+.dq-stat-grade{font-size:12px;font-weight:600;min-width:16px}
+.dq-msg{background:#000;border:2px solid #f0e68c;border-radius:2px;padding:10px 12px;font-size:11px;color:#fff;line-height:1.9;margin-top:10px;white-space:pre-wrap}
 </style>
 </head>
 <body>
+
+<!-- 詳細モーダル -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnBg(event)">
+  <div class="modal" id="modalBox">
+    <div class="modal-header">
+      <h2 id="modalName"></h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <button class="modal-btn share" onclick="shareStaff()">🔗　結果リンクをコピー</button>
+      <button class="modal-btn pdf" onclick="printStaff()">📄　PDFで保存</button>
+    </div>
+  </div>
+</div>
 
 <!-- ロック画面 -->
 <div class="lock" id="lockScreen">
@@ -149,7 +201,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sa
 
 <script>
 // ★ここにGASのURLを貼り付ける★
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzgkI8FSBonkuHgzecGOgy0hHRt3k6RJ30r8WZgIlufm7Hccuh8mCrC_v6VtsI_Tg/exec';
+const GAS_URL = 'YOUR_GAS_URL_HERE';
 const PW = 'Honbu1105';
 
 let allData = [];
@@ -262,6 +314,137 @@ function renderAll(){
   renderBubble(allData);
 }
 
+let currentStaff = null;
+
+function openModal(d){
+  if(!d)return;
+  currentStaff = d;
+  document.getElementById('modalName').textContent = d['名前']||'';
+  document.getElementById('modalOverlay').classList.add('open');
+
+  const sk=[
+    {label:'実行力',key:'実行力',color:'#534AB7'},
+    {label:'リーダーシップ',key:'リーダーシップ',color:'#EF9F27'},
+    {label:'対人・コミュニケーション',key:'対人・コミュニケーション',color:'#1D9E75'},
+    {label:'創造性',key:'創造性',color:'#D4537E'},
+    {label:'分析思考',key:'分析思考',color:'#378ADD'},
+    {label:'柔軟性・適応',key:'柔軟性・適応',color:'#888780'},
+    {label:'モチベーション',key:'モチベーション',color:'#639922'},
+    {label:'成長志向',key:'成長志向',color:'#7F77DD'},
+    {label:'チームワーク',key:'チームワーク',color:'#0F6E56'},
+  ];
+  const overall=parseFloat(d['スキル総合']||0);
+  const top3=(d['強みTOP3']||'').split('、').filter(Boolean);
+  const low2=(d['育成ポイント']||'').split('、').filter(Boolean);
+  const role=getRole(d);
+  const dqJob=getDQJobFromData(d);
+
+  document.getElementById('modalBody').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <span class="role-badge" style="${BADGE_STYLES[role]||''}">${role}</span>
+      <span style="font-size:13px;color:#888">スキル総合：<strong style="color:#534AB7">${overall.toFixed(1)}</strong> / 5.0</span>
+    </div>
+    <div class="modal-tags">
+      ${top3.map(t=>`<span class="modal-tag" style="background:#E1F5EE;color:#0F6E56">強み：${t}</span>`).join('')}
+      ${low2.map(t=>`<span class="modal-tag" style="background:#FAEEDA;color:#854F0B">育成：${t}</span>`).join('')}
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">スキル・行動傾向</div>
+      ${sk.map(c=>`
+        <div class="modal-bar-row">
+          <div class="modal-bar-meta"><span>${c.label}</span><span>${parseFloat(d[c.key]||0).toFixed(1)}</span></div>
+          <div class="modal-bar-track"><div class="modal-bar-fill" style="width:${parseFloat(d[c.key]||0)/5*100}%;background:${c.color}"></div></div>
+        </div>`).join('')}
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">性格プロフィール</div>
+      <div class="modal-profile" style="background:#FFF8E8;color:#633806"><strong>心が動く源泉：</strong>${d['心が動く源泉']||'—'}</div>
+      <div class="modal-profile" style="background:#FFF0F5;color:#72243E"><strong>褒め方：</strong>${d['褒め方']||'—'}　<strong>叱り方：</strong>${d['フィードバック']||'—'}</div>
+      <div class="modal-profile" style="background:#FFF0F0;color:#501313"><strong>ストレスサイン：</strong>${d['ストレスサイン']||'—'}<br><strong>ストレス源：</strong>${d['ストレス源']||'—'}　<strong>回復：</strong>${d['回復パターン']||'—'}</div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">職業判定</div>
+      <div class="dq-box">
+        <div class="dq-title">★ しょくぎょう はんてい ★</div>
+        <div class="dq-name-plate"><div>${dqJob.icon}　${dqJob.name}</div></div>
+        <div class="dq-stats">
+          ${Object.entries(dqJob.stats).map(([k,v])=>{
+            const gc={'S':'#f0e68c','A':'#00c800','B':'#7fffd4','C':'#f0a030','D':'#ff8888'};
+            const w={S:100,A:80,B:60,C:40,D:20};
+            return `<div class="dq-stat-row">
+              <span class="dq-stat-label">${k}</span>
+              <div class="dq-stat-track"><div class="dq-stat-fill" style="width:${w[v]||50}%;background:${gc[v]||'#888'}"></div></div>
+              <span class="dq-stat-grade" style="color:${gc[v]||'#888'}">${v}</span>
+            </div>`;}).join('')}
+        </div>
+        <div class="dq-msg">${dqJob.desc}</div>
+      </div>
+    </div>
+  `;
+}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('open');
+  currentStaff=null;
+}
+
+function closeModalOnBg(e){
+  if(e.target===document.getElementById('modalOverlay')) closeModal();
+}
+
+function shareStaff(){
+  if(!currentStaff)return;
+  const d=currentStaff;
+  const scores={
+    exec:parseFloat(d['実行力']||0),lead:parseFloat(d['リーダーシップ']||0),
+    rel:parseFloat(d['対人・コミュニケーション']||0),cre:parseFloat(d['創造性']||0),
+    ana:parseFloat(d['分析思考']||0),flex:parseFloat(d['柔軟性・適応']||0),
+    mot:parseFloat(d['モチベーション']||0),grow:parseFloat(d['成長志向']||0),
+    team:parseFloat(d['チームワーク']||0)
+  };
+  const data={
+    name:d['名前'],overall:d['スキル総合'],
+    top3:d['強みTOP3'],low2:d['育成ポイント'],
+    scores,
+    motv:d['心が動く源泉'],praise:d['褒め方'],feed:d['フィードバック'],
+    stressSign:d['ストレスサイン'],stressSrc:d['ストレス源'],recovery:d['回復パターン']
+  };
+  const shindan=location.href.replace('dashboard.html','shindan.html');
+  const encoded=btoa(encodeURIComponent(JSON.stringify(data)));
+  const url=`${shindan}?result=${encoded}`;
+  navigator.clipboard.writeText(url).then(()=>alert('リンクをコピーしました！\nスタッフにそのまま送れます。'));
+}
+
+function printStaff(){
+  if(!currentStaff)return;
+  window.print();
+}
+
+function getDQJobFromData(d){
+  const s={
+    lead:parseFloat(d['リーダーシップ']||0),
+    mot:parseFloat(d['モチベーション']||0),
+    rel:parseFloat(d['対人・コミュニケーション']||0),
+    exec:parseFloat(d['実行力']||0),
+    ana:parseFloat(d['分析思考']||0),
+    cre:parseFloat(d['創造性']||0),
+    grow:parseFloat(d['成長志向']||0),
+    flex:parseFloat(d['柔軟性・適応']||0),
+    team:parseFloat(d['チームワーク']||0),
+  };
+  const jobs=[
+    {name:'ゆうしゃ',icon:'⚔️',cond:s=>s.lead>=3&&s.mot>=3&&s.rel>=2.5,desc:'なかまを　ひきつける　ちからが　さいきょうの　ぶき！\nぜんせんで　チームを　ひっぱる　そんざい。',stats:{攻撃:'A',魔力:'C',仲間力:'A',適応:'B'}},
+    {name:'せんし',icon:'🛡️',cond:s=>s.exec>=3.5&&s.lead<3,desc:'どんな　しめきりも　ちからずくで　のりきる　じっこうりょくの　かたまり。',stats:{攻撃:'S',魔力:'D',仲間力:'B',適応:'C'}},
+    {name:'まほうつかい',icon:'🔮',cond:s=>s.ana>=3&&s.cre>=3,desc:'データと　ろんりが　ぶき。ぶんせきと　そうぞうで　ふかのうを　かのうにする。',stats:{攻撃:'C',魔力:'S',仲間力:'C',適応:'B'}},
+    {name:'けんじゃ',icon:'📚',cond:s=>s.ana>=3&&s.grow>=3,desc:'ぶんせきりょくと　せいちょうし　りょうほう　そなえた　まれな　そんざい。',stats:{攻撃:'B',魔力:'A',仲間力:'B',適応:'A'}},
+    {name:'そうりょ',icon:'✨',cond:s=>s.rel>=3.5&&s.team>=3,desc:'なかまの　ちからを　ひきだし　チームを　まもる。\nあなたが　いると　パーティーが　あんていする。',stats:{攻撃:'C',魔力:'B',仲間力:'S',適応:'A'}},
+    {name:'ぎんゆうしじん',icon:'🎵',cond:s=>s.rel>=3&&s.rel>=3,desc:'ことばと　ふんいきで　チームを　つなぐ。\nコミュ力が　そしきの　くうきを　かえる。',stats:{攻撃:'C',魔力:'B',仲間力:'A',適応:'S'}},
+    {name:'とうぞく',icon:'🗡️',cond:s=>s.flex>=3&&s.exec>=2.5,desc:'へんかに　つよく　すきまを　ぬける　きどうりょく。\nどんな　かんきょうでも　すばやく　てきおうする。',stats:{攻撃:'B',魔力:'C',仲間力:'B',適応:'S'}},
+    {name:'まものつかい',icon:'🌟',cond:s=>s.cre>=3.5,desc:'だれも　おもいつかない　はっそうで　ふかのうを　かのうにする。',stats:{攻撃:'B',魔力:'A',仲間力:'C',適応:'B'}},
+  ];
+  return jobs.find(j=>j.cond(s))||{name:'けんじゃのたまご',icon:'🥚',desc:'すべての　のうりょくが　まんべんなく　ある　バランス型。',stats:{攻撃:'B',魔力:'B',仲間力:'B',適応:'B'}};
+}
+
 function renderStaffTable(data){
   if(!data.length){document.getElementById('staffTableWrap').innerHTML='<div class="empty">データなし</div>';return;}
   document.getElementById('staffTableWrap').innerHTML=`
@@ -270,7 +453,7 @@ function renderStaffTable(data){
       <tbody>${data.map(d=>{
         const role=getRole(d);
         return `<tr>
-          <td style="font-weight:500">${d['名前']||''}</td>
+          <td><span class="name-link" onclick="openModal(allData.find(x=>x['タイムスタンプ']==='${d['タイムスタンプ']||''}'))">${d['名前']||''}</span></td>
           <td><span class="role-badge" style="${BADGE_STYLES[role]||''}">${role}</span></td>
           <td style="color:#888;font-size:11px">${(d['強みTOP3']||'').split('、')[0]||''}</td>
           <td>${sbar(d['実行力'],'#534AB7')}</td>
