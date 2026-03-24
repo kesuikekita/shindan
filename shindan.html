@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>スタッフ適性・性格診断</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif;background:#f5f5f0;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px}
@@ -89,7 +90,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sa
 
 <script>
 // ★ここにGASのURLを貼り付ける★
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzgkI8FSBonkuHgzecGOgy0hHRt3k6RJ30r8WZgIlufm7Hccuh8mCrC_v6VtsI_Tg/exec';
+const GAS_URL = 'YOUR_GAS_URL_HERE';
 
 const CATS=[
   {id:'exec',label:'実行力',color:'#534AB7'},
@@ -239,6 +240,7 @@ function showResult(){
     </div>
     <div class="result-card">
       <div class="result-title">スキル・行動傾向</div>
+      <div style="position:relative;height:220px;margin-bottom:12px"><canvas id="staffRadar"></canvas></div>
       ${sk.map(c=>`<div class="bar-row"><div class="bar-meta"><span>${c.label}</span><span>${score(c.id).toFixed(1)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${score(c.id)/5*100}%;background:${c.color}"></div></div></div>`).join('')}
     </div>
     <div class="profile-box" style="background:#FFF8E8;color:#633806"><strong>心が動く源泉：${p.tm}</strong><br>${p.md}</div>
@@ -260,6 +262,34 @@ function showResult(){
   `;
 
   renderDQ(scores);
+
+  // レーダーチャート描画
+  setTimeout(()=>{
+    const canvas=document.getElementById('staffRadar');
+    if(!canvas)return;
+    if(window._staffRadarChart){window._staffRadarChart.destroy();}
+    window._staffRadarChart=new Chart(canvas,{
+      type:'radar',
+      data:{
+        labels:['実行力','リーダー','対人','創造性','分析思考','柔軟性','モチベ','成長志向','チームワーク'],
+        datasets:[{
+          label:userName,
+          data:sk.map(c=>scores[c.id]),
+          backgroundColor:'rgba(83,74,183,0.2)',
+          borderColor:'#534AB7',
+          borderWidth:2,
+          pointRadius:3,
+          pointBackgroundColor:'#534AB7'
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        scales:{r:{min:0,max:5,ticks:{stepSize:1,font:{size:9},backdropColor:'transparent'},pointLabels:{font:{size:10}},grid:{color:'rgba(0,0,0,0.08)'},angleLines:{color:'rgba(0,0,0,0.08)'}}},
+        plugins:{legend:{display:false}}
+      }
+    });
+  },50);
+
   sendResult(overall, top3, low2, scores, p);
 
   setTimeout(()=>{
