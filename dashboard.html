@@ -350,11 +350,15 @@ function openModal(d){
     </div>
     <div class="modal-section">
       <div class="modal-section-title">スキル・行動傾向</div>
-      ${sk.map(c=>`
-        <div class="modal-bar-row">
-          <div class="modal-bar-meta"><span>${c.label}</span><span>${parseFloat(d[c.key]||0).toFixed(1)}</span></div>
-          <div class="modal-bar-track"><div class="modal-bar-fill" style="width:${parseFloat(d[c.key]||0)/5*100}%;background:${c.color}"></div></div>
-        </div>`).join('')}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+        <div style="position:relative;height:200px"><canvas id="modalRadar"></canvas></div>
+        <div>${sk.map(c=>`
+          <div class="modal-bar-row">
+            <div class="modal-bar-meta"><span>${c.label}</span><span>${parseFloat(d[c.key]||0).toFixed(1)}</span></div>
+            <div class="modal-bar-track"><div class="modal-bar-fill" style="width:${parseFloat(d[c.key]||0)/5*100}%;background:${c.color}"></div></div>
+          </div>`).join('')}
+        </div>
+      </div>
     </div>
     <div class="modal-section">
       <div class="modal-section-title">性格プロフィール</div>
@@ -381,10 +385,44 @@ function openModal(d){
       </div>
     </div>
   `;
+  // レーダーチャート描画
+  setTimeout(()=>{
+    const canvas=document.getElementById('modalRadar');
+    if(!canvas)return;
+    const teamAvgs=[
+      avg(allData.map(x=>parseFloat(x['実行力']||0))),
+      avg(allData.map(x=>parseFloat(x['リーダーシップ']||0))),
+      avg(allData.map(x=>parseFloat(x['対人・コミュニケーション']||0))),
+      avg(allData.map(x=>parseFloat(x['創造性']||0))),
+      avg(allData.map(x=>parseFloat(x['分析思考']||0))),
+      avg(allData.map(x=>parseFloat(x['柔軟性・適応']||0))),
+      avg(allData.map(x=>parseFloat(x['モチベーション']||0))),
+      avg(allData.map(x=>parseFloat(x['成長志向']||0))),
+      avg(allData.map(x=>parseFloat(x['チームワーク']||0))),
+    ];
+    const staffVals=sk.map(c=>parseFloat(d[c.key]||0));
+    if(window._modalRadarChart) window._modalRadarChart.destroy();
+    window._modalRadarChart=new Chart(canvas,{
+      type:'radar',
+      data:{
+        labels:['実行','リーダー','対人','創造','分析','柔軟','モチベ','成長','チーム'],
+        datasets:[
+          {label:d['名前'],data:staffVals,backgroundColor:'rgba(83,74,183,0.2)',borderColor:'#534AB7',borderWidth:2,pointRadius:3,pointBackgroundColor:'#534AB7'},
+          {label:'チーム平均',data:teamAvgs,backgroundColor:'rgba(29,158,117,0.1)',borderColor:'#1D9E75',borderWidth:1.5,pointRadius:2,pointBackgroundColor:'#1D9E75',borderDash:[4,4]}
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        scales:{r:{min:0,max:5,ticks:{stepSize:1,font:{size:8},backdropColor:'transparent'},pointLabels:{font:{size:9}},grid:{color:'rgba(0,0,0,0.08)'},angleLines:{color:'rgba(0,0,0,0.08)'}}},
+        plugins:{legend:{display:false}}
+      }
+    });
+  },50);
 }
 
 function closeModal(){
   document.getElementById('modalOverlay').classList.remove('open');
+  if(window._modalRadarChart){window._modalRadarChart.destroy();window._modalRadarChart=null;}
   currentStaff=null;
 }
 
